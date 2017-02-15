@@ -1,0 +1,1386 @@
+---
+title: "Analysing Gender Pay Gap"
+author: Simar Soni (In collaboration with Vaishnavi Vadlamani and Siddharth Kedia)
+output: 
+  html_document:
+    toc: true
+    toc_depth: 5
+    fig_width: 5
+    fig_height: 5
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+```{r echo = FALSE}
+library(plyr)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+options(scipen=4)
+```
+
+###INTRODUCTION
+This project is trying to address the question "Is there a significant difference in income between men and women? Does the difference vary depending on other factors such as education, marital status, criminal history, drug use, childhood household factors, profession, etc."
+
+We are using NLSY97 (National Longitudinal Survey of Youth, 1997 cohort) data set. The National Longitudinal Surveys (NLS) are a set of surveys designed to gather information at multiple points in time on the labor market activities and other significant life events of several groups of men and women. For more than 4 decades, NLS data have served as an important tool for economists, sociologists, and other researchers. The NLSY97 data set contains survey responses on thousands of individuals who have been surveyed every one or two years starting in 1997.
+
+```{r echo = FALSE}
+survey <- read.csv("nlsy97_income.csv", head = TRUE)
+```
+
+On loading the data from "nlsy97_income.csv", from the data set you get `r nrow(survey)` observations over `r ncol(survey)` variables.
+
+
+```{r echo = FALSE}
+
+names(survey) <- c("totalincarceration", #select
+    "INCARC_AGE_FIRST_XRND",
+    "INCARC_LENGTH_LONGEST_XRND",
+    "PUBID_1997",
+    "YSCH-36400_1997",
+    "YSCH-37000_1997",
+    "YSAQ-010_1997",
+    "YEXP-300_1997",
+    "YEXP-1500_1997",
+    "YEXP-1600_1997",
+    "YEXP-1800_1997",
+    "YEXP-2000_1997",
+    "gender",#select
+    "KEY_BDATE_M_1997",
+    "KEY_BDATE_Y_1997",
+    "physicalEmotionalCondition",#select
+    "PC12-024_1997",
+    "PC12-028_1997",
+    "CV_BIO_MOM_AGE_CHILD1_1997",
+    "CV_BIO_MOM_AGE_YOUTH_1997",
+    "CV_ENROLLSTAT_1997",
+    "CV_HH_NET_WORTH_P_1997",
+    "CV_SAMPLE_TYPE_1997",
+    "CV_HGC_RES_DAD_1997",
+    "CV_HGC_RES_MOM_1997",
+    "race",#select
+    "FP_YMFRELAT_1997",
+    "FP_YFMRELAT_1997",
+    "YSCH-6800_1998",
+    "YSCH-7300_1998",
+    "YSAQ-372B_1998",
+    "FP_YMFRELAT_1998",
+    "FP_YFMRELAT_1998",
+    "YSAQ-371_2000",
+    "YSAQ-282J_2002",
+    "YSAQ-282Q_2002",
+    "NET_WORTH2003",#select
+    "CV_BIO_CHILD_HH_2003",
+    "weight",
+    "YSAQ-373_2004",
+    "YSAQ2-292_2005",
+    "YTEL-52~000001_2007",
+    "YTEL-52~000002_2007",
+    "YTEL-52~000003_2007",
+    "YTEL-52~000004_2007",
+    "biologicalChild", #select
+    "collegeType",#select
+    "familyIncome",#select
+    "CV_HH_SIZE_2011",
+    "CV_HH_UNDER_18_2011",
+    "CV_HH_UNDER_6_2011",
+    "highestDegree",#select
+    "YSCH-3112_2011",
+    "YSAQ-000A000001_2011",
+    "YSAQ-000A000002_2011",
+    "YSAQ-000B_2011",
+    "YSAQ-360C_2011",
+    "YSAQ-364D_2011",
+    "YSAQ-371_2011",
+    "drugUse",#select
+    "YSAQ-373_2011",
+    "YSAQ-374_2011",
+    "YHEA29-285_2011",
+    "industry", #select
+    "VERSION_R16_2013",
+    "ReceiveIncomefromJob", #select
+    "income",#select
+    "estimatedIncome", #select
+    "maritalStatus", #select
+    "YINC_2600_2013",
+    "YINC_2700_2013",
+    "CVC_SAT_MATH_SCORE_2007_XRND",
+    "CVC_SAT_VERBAL_SCORE_2007_XRND",
+    "CVC_ACT_SCORE_2007_XRND",
+    "CVC_ASSETS_DEBTS_20_XRND",
+    "CVC_TTL_JOB_TEEN_XRND",
+    "CVC_TTL_JOB_ADULT_ET_XRND",
+    "CVC_TTL_JOB_ADULT_ALL_XRND",
+    "CVC_ASSETS_DEBTS_30_XRND")
+
+selected_attributes <- c("totalincarceration"  , "gender", "physicalEmotionalCondition" ,"race", "biologicalChild",  "collegeType", "familyIncome", "highestDegree" , "drugUse" , "industry", "income" ,"estimatedIncome" ,"maritalStatus")
+
+nyse <- subset(survey, select = selected_attributes)
+nyse_sub <- nyse
+```
+
+From the `r ncol(survey)` given variables given in the data set, I have selected `r length(selected_attributes)` Variables for further analysis which I hypothesised will have the maximum impact on Income Gaps.
+
+
+###DATA SUMMARY
+
+##### Renaming the Variables
+The dataset doesn’t come with very descriptive variable names. I changed the variable names to more descriptive names to get better column names. 
+
+Below is the list of variables names selected and their definition:
+
+
+ Variable    | Description 
+------------------------------|---------------------------------
+totalincarceration | Total number of incarcerations reported by the respondent
+gender	| Gender of the Respondent (Male/Female) 
+physicalEmotionalCondition	  | Respondent's Physical and Emotional Condition that limits School/Work 
+race | Race of the Respondent 
+biologicalChild	| Number of biological children born and residing in the household 
+collegeType	| Respondent's School Information (public, private not-for-profit, private for-profit or Not Attended College) 
+familyIncome	| Gross family income in the previous year 
+drugUse	| Respondent used Hard Drugs since DLI 
+industry	| Type of Industry or Business 
+income	| Income received by Respondent Last Year 
+maritalStatus	| Spouse received income is use to understand if the respondent is married or not.
+
+##### Project Hypothesis
+
+1. **Total Number of Incarcerations**
+    + Total Number of Incarceration may have greater impact on women than men. Some occupations such as construction and mining (heavy labor oriented work) is more male dominated  and is not impacted by the number of total number of Incarcerations, while occupations such as nurses and nanny which is more female dominated have a huge impact by the total number of incarcerations. This might lead to total number of incarcerations having an impact on Income Gap between men and women.
+2. **Physical and Emotional Conditions during school/work**
+    + Physical and Emotional may have greater impact on income for women than men. Women are considered to be the weaker gender and according to a study done Socioeconomic status (SES), women have a 20% higher chance of depression and socio economic troubles which is not addressed and registered. This might lead to women earning less as compared to men.
+3. **Race**
+    + Race may have greater impact on income for women than men. According to a study done by AAUW, race has an affect on gender wage gap. These affects may be bacause of uneven distribution of women by race.
+4. **Number of Children at Home**
+    + Number of children may have greater impact on women than men. Still living in a Patriarchal society, men are considered to be bread winners and women are considered to be home makers. More number of children at home may lead to women staying at home or taking up part time jobs which pay less.
+5. **Type of College**
+    + Type of college may have greater impact on women than men. According at a study done by AAUW, gender wage gap is affected by the type of college. A private college has better opportunities for women than a non- profit college.
+6. **Family Income**
+    + Family Income may have greater impact on income for women than men. In a male dominated society, generally the male is considered to have a higher percentage share in the family income. Some household, the women earns only if the husband's salary is not enough to meet ends.s
+7. **Drug Use**
+    + Drug use may have greater impact on women than men. Some occupations such as construction and mining (heavy labor oriented work) which is more male dominated may not have an impact on taking drugs, while occupations such as nurses and nanny which is more female dominated have a huge impact by drug use. This might lead to drug use having an impact on Income Gap between men and women.    
+8. **Industry**
+    + Industry should have an impact on gender wage gap. Some occupations such as construction and mining (heavy labor oriented work) which is more male dominated and are better paying jobs for men, while occupations such as nurses and nanny which is more female dominated and are better paying jobs for women.
+
+9. **Marital Status**
+    + Marital Status may have greater impact on women than men. According to a study done, married men earn more than unmarried men, while unmarried women earn more than married women. They two genders have opposite impact of marital Status.
+    
+
+```{r echo=FALSE}
+nyse$industry <- with(nyse,ifelse((industry >= 170 & industry<= 290),1,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 370 & industry<= 490),2,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 570 & industry<= 690),3,industry))
+nyse$industry <- with(nyse,ifelse((industry == 4070),4,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 1070 & industry<= 3990),5,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 4070 & industry<= 4590),6,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 4670 & industry<= 5790),7,industry))
+nyse$industry <- with(nyse,ifelse((industry == 5890 ),8,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 6070 & industry<= 6390),9,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 6470 & industry<= 6780),10,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 6870 & industry<= 7190),11,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 7270 & industry<= 7790),12,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 7860 & industry<= 8470),13,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 8560 & industry<= 8690),14,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 8770 & industry<= 9290),15,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 9370 & industry<= 9590),16,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 9670 & industry<= 9890),17,industry))
+nyse$industry <- with(nyse,ifelse((industry >= 9950 & industry<= 9990),18,industry))
+nyse$industry <- with(nyse,ifelse((industry == 770 ),19,industry))
+```
+
+##### Renaming the factors
+
+All the factors are currently represented as integers. I used transform() and mapvalues() functions to convert variables to factors and give the factors more meaningful levels
+
+```{r echo=FALSE}
+nyse <- transform(nyse, 
+                  gender = as.factor(mapvalues(gender, c(1, 2), c("male", "female"))),
+                  
+                  physicalEmotionalCondition = as.factor(mapvalues(physicalEmotionalCondition, c(0,1,-1,-2,-4), c("No", "Yes", "RefusedToAnswer", "DontKnow","Valid Skip"))),
+                  
+                  race = as.factor(mapvalues(race, 1:4, c("Black", "Hispanic", "Mixed", "Other"))),
+                  
+                  collegeType = as.factor(mapvalues(collegeType, c(1,2,3,-3,-4,-5), c("Public", "Private for Non Profit", "Private for Profit","Invalid","Valid Skip","NotInterviewed"))),
+                  
+                  highestDegree = as.factor(mapvalues(highestDegree, c(0,1,2,3,4,5,6,7,-3,-5), c("None", "GED", "High school diploma (Regular 12 year program)","Associate/Junior college (AA)" ,"Bachelor's degree (BA, BS)","Master's degree (MA, MS)","PhD","Professional degree (DDS, JD, MD)","Invalid Skip","Not Interviewed"))),
+                  
+                  drugUse = as.factor(mapvalues(drugUse, c(0,1,-1,-2,-4,-5), c("No", "Yes", "RefusedToAnswer", "DontKnow","Valid Skip","NotInterviewed"))),
+                  
+                  industry = as.factor(mapvalues(industry, c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,-3,-4,-5), c("AGRICULTURE, FORESTRY AND FISHERIES", "MINING", "UTILITIES",  "CONSTRUCTION", "MANUFACTURING", "WHOLESALE TRADE", "RETAIL TRADE", "ARTS, ENTERTAINMENT AND RECREATION SERVICES", "TRANSPORTATION AND WAREHOUSING", "INFORMATION AND COMMUNICATION", "FINANCE, INSURANCE, AND REAL ESTATE", "PROFESSIONAL AND RELATED SERVICES", "EDUCATIONAL, HEALTH, AND SOCIAL SERVICES","ENTERTAINMENT, ACCOMODATIONS, AND FOOD SERVICES", "OTHER SERVICES","PUBLIC ADMINISTRATION", "ACTIVE DUTY MILITARY","ACS SPECIAL CODES","CONSTRUCTION", "Invalid Skip","Valid Skip","NotInterviewed"))),
+                 
+                  
+                  estimatedIncome = as.numeric(mapvalues(estimatedIncome, c(1,2,3,4,5,6,7), c(2500, 7500, 17500, 37500, 75000,180331, 180331))),
+                  
+                 maritalStatus = as.factor(mapvalues(maritalStatus, c(0,1,-1,-2,-4,-5), c("No", "Yes", "RefusedToAnswer", "DontKnow","Valid Skip","NotInterviewed"))) 
+              )
+
+nyse_before_dataclean <- nyse
+```
+
+```{r echo = F, comment =''}
+str(nyse_before_dataclean)
+```
+
+##### Exploring the DataSet
+
+Starting with comparing the Income between Male and Female using a simple box plot:
+
+```{r echo = FALSE, fig.align='center'}
+qplot(x = gender, y = income,
+      geom = "boxplot", data = nyse_before_dataclean,
+      xlab = "Gender", 
+      ylab = "Total Income Last Year",
+      fill = I("skyblue2"),
+      main = "Income vs Gender")
+```
+
+> OBSERVATION :The above plot suggests that men earn more than women. 
+
+Also from the graph we can observe, the data has many outliers which might influence our interpretation of the data set. The income data is positively skewed which might also affect our inferences.
+
+To get a better understanding of the data set, plotting the data distribution using Q-Q Plot
+
+```{r echo = FALSE, out.extra='style="float:left"', fig.width=4.6, fig.height=6}
+with(nyse_before_dataclean, qqnorm(income[gender=="male"], main = "Male DataSet Normal Q-Q Plot",xlab = "Theoretical Quantiles", ylab = "Income"))
+with(nyse_before_dataclean, qqline(income[gender=="male"], col = "blue"))
+
+with(nyse_before_dataclean, qqnorm(income[gender=="female"], main = "Female DataSet Normal Q-Q Plot", xlab = "Theoretical Quantiles", ylab = "Income"))
+with(nyse_before_dataclean, qqline(income[gender=="female"], col = "blue"))
+```
+
+From this we can see that the data is skewed at the edges. A lot of data points are marked as 0 income and the top 2 percent of the data is top coded to the average value of the top 2 percent earning population ie.`r max(nyse$income)`. We need to clean the data set before moving forward with the analysis as dirty data will give us incorrect results.
+
+###DATA CLEANING
+
+The Data taken from NLSY97 is messy and has many issues which need to be addressed first before performing any further analysis. There are various problems in the data
+
+**PROBLEM 1**
+
+Some data values are coded for all the attributes 
+
+ Top Coded Values    | Description 
+------------------------------|---------------------------------
+-1 | Refused to answer
+-2 | Dont Know 
+-3 | Invalid Skip (Data not retrieved/lost)
+-4 | Valid Skip (Question not relevant to the respondent)
+-5 | Respondent not interviewed that year
+
+**PROBLEM 2**
+
+Top 2 percent Income values are coded to the average value of the top 2 percent of cases ie.`r max(nyse$income)` as the respondents were not comfortable with declaring their true income in the survey. This will result in a skewed data set as seen in the above data distribution.
+
+```{r echo=FALSE}
+#For Physical and Emotional Condition
+# as there are only 1092-Valid Skips, 2-Refused and 6-Dont Know 
+# So we can consider all these variables as NA
+index <- nyse$physicalEmotionalCondition == "Valid Skip"
+nyse$physicalEmotionalCondition[index] <- NA
+index <- nyse$physicalEmotionalCondition == "RefusedToAnswer"
+nyse$physicalEmotionalCondition[index] <- NA
+index <- nyse$physicalEmotionalCondition == "DontKnow"
+nyse$physicalEmotionalCondition[index] <- NA
+nyse$physicalEmotionalCondition <- factor(nyse$physicalEmotionalCondition)
+
+#For BIO CHILDREN R HAS IN HOUSEHOLD
+# as there are only 23-Invalid skip 3465-Valid Skips, 1505-not interviewed
+# So we can consider all these variables as NA
+#Reason for valid skip could be that they are still not married
+index <- nyse$biologicalChild == "-3"
+nyse$biologicalChild[index] <- NA
+index <- nyse$biologicalChild == "-4"
+nyse$biologicalChild[index] <- NA
+index <- nyse$biologicalChild == "-5"
+nyse$biologicalChild[index] <- NA
+
+#For COLLEGE 01 PUBLIC OR PRIVATE
+# as there are only 52-Invalid skip 5937-Valid Skips, 1561-not interviewed
+# So we can consider all these variables as NA
+index <- nyse$collegeType == "NotInterviewed"
+nyse$collegeType[index] <- NA
+index <- nyse$collegeType == "Invalid"
+nyse$collegeType[index] <- NA
+index <- nyse$collegeType == "Valid Skip"
+nyse <- transform(nyse,collegeType = as.factor(mapvalues(collegeType, from = "Valid Skip", to ="Did Not Attend" )) )
+nyse$collegeType <- factor(nyse$collegeType)
+
+#For Highest Degree before 2011 and 2012
+# as there are only 59-Invalid skip 5937-Valid Skips, 1561-not interviewed
+# So we can consider all these variables as NA
+index <- nyse$highestDegree == "NotInterviewed"
+nyse$highestDegree[index] <- NA
+index <- nyse$highestDegree == "Invalid"
+nyse$highestDegree[index] <- NA
+index <- nyse$highestDegree == "Valid Skip"
+nyse$highestDegree[index] <- NA
+nyse$highestDegree <- factor(nyse$highestDegree)
+
+#For Used Cocaine 
+# as there are only  85-Valid Skips, 1561-not interviewed
+# condsidering all the people who refused to answer  or dont know to take drugs but are shy to answer
+index <- nyse$drugUse == "NotInterviewed"
+nyse$drugUse[index] <- NA
+nyse <- transform(nyse,drugUse = as.factor(mapvalues(drugUse, from = "RefusedToAnswer", to ="Yes" )) )
+nyse <- transform(nyse,drugUse = as.factor(mapvalues(drugUse, from = "DontKnow", to ="Yes" )) )
+index <- nyse$drugUse == "Valid Skip"
+nyse$drugUse[index] <- NA
+nyse$drugUse <- factor(nyse$drugUse)
+
+#For Type of Industry
+# as there are only 59-Invalid skip 1128-Valid Skips, 1561-not interviewed
+# condsidering all the people who refused to answer  or dont know to take drugs but are shy to answer
+index <- nyse$industry == "NotInterviewed"
+nyse$industry[index] <- NA
+index <- nyse$industry == "Invalid Skip"
+nyse$industry[index] <- NA
+nyse <- transform(nyse,industry = as.factor(mapvalues(industry, from = "Valid Skip", to ="Not Working" )) )
+nyse$industry <- factor(nyse$industry)
+
+
+#For maritalStatus
+# Converting this variable to whether they are married or not
+# condsidering all the people who refused to answer  or dont know to take drugs but are shy to answer
+index <- nyse$maritalStatus == "NotInterviewed"
+nyse$maritalStatus[index] <- NA
+index <- nyse$maritalStatus == "RefusedToAnswer"
+nyse$maritalStatus[index] <- NA
+index <- nyse$maritalStatus == "DontKnow"
+nyse$maritalStatus[index] <- NA
+nyse <- transform(nyse,maritalStatus = as.factor(mapvalues(maritalStatus, from = "Yes", to ="Married" )) )
+nyse <- transform(nyse,maritalStatus = as.factor(mapvalues(maritalStatus, from = "No", to ="Married" )) )
+nyse <- transform(nyse,maritalStatus = as.factor(mapvalues(maritalStatus, from = "Valid Skip", to ="Not Married" )) )
+nyse$maritalStatus <- factor(nyse$maritalStatus)
+#with(nyse, plot(maritalStatus, income))
+
+
+#For Family Income in 2011
+# These are also topcoded //// NEED to fix that
+# condsidering all the people who refused to answer  or dont know to take drugs but are shy to answer
+index <- nyse$familyIncome == -3
+nyse$familyIncome[index] <- NA
+index <- nyse$familyIncome == -5
+nyse$familyIncome[index] <- NA
+#with(nyse, plot(familyIncome, income))
+
+
+# Income ----
+# Dont know and Refused to Know ---- Adding them to the top coded values --- as they are earning really high 
+# valid skip ---- still studying so the income is considered as 0.
+nyse$income <- with(nyse,ifelse((income == -1 | income == -2),estimatedIncome,income))
+nyse <- transform(nyse,income = as.integer(mapvalues(income, from = -4 , to = 0 )) )
+index <- nyse$income == 0
+nyse$income[index] <- NA
+index <- nyse$income == -5
+nyse$income[index] <- NA
+nyse <- nyse[-which(is.na(nyse$income)),]
+
+
+```
+
+##### Handling Missing Data
+
+To handle the missing values due to multiple reasons, depending on the attribute I have changed some variables to Not Available(NA) and some interpretted to impute the values in different ways.
+
+|  Variable|  Refusal | Don't Know|  Invalid Skip |  Valid Skip | Non-Interview |
+|-------------:|------------:|-------------:|-------------:|------------:|-------------:|
+|        income|  Change to Middle value of Estimated Income Range if available |  Change to Middle value of Estimated Income Range if available|           -|   0|           NA|
+| totalincarceration|          -|            -|           -|         -|          -|
+|             gender|             -|            -|           -|         -|          -|
+|   physicalEmotionalCondition|          NA|           NA|           -|          NA|           -|
+|               race|                      -|            -|           -|         -|          -|
+|    biologicalChild|          -|            -|          NA|        NA|         NA|
+|        collegeType|          -|            -|          NA|         Did not Attend|         NA|
+|       familyIncome|          -|            -|          NA|         -|         NA|
+|      highestDegree|          -|            -|          NA|        NA|         NA|
+|            drugUse| Used Drugs|   Used Drugs|          NA|         -|         NA|
+|           industry|          -|            -|          NA| Not Working|       NA|
+|     marital Status|         NA|            NA|           -|  Not Married|          NA|
+
+
+* **Income**
+     + Imputed the income with estimated income for respondents who refused to answer or did not know their income but have provided with an estimated income range
+     + For respondents the question was not valid, the income is considered as 0 as they are not working. ( All 0 value income are removed in the later step)
+     
+As some of the respondents have given an estimated income range rather than their true income,the middle value of the estimated income range can be used to predict their income as this will improve the data set and reduce the number of missing values. They might not be exact but will provide us with a good estimate of their income.
+
+As we are removing the top 2 percent of the income observations to reduce the skewness, it is also important to remove the observations with 0 income as they dont know give us any valid information and the data set will be biased for low income values. 
+     
+* **College Type**
+     + For respondents the question was not valid, it is assumed that they did not attend college. ( A new category "Not Attend College" is        added.)
+     
+* **Industry**
+     + For respondents the question was not valid, it is assumed that they are not working. ( A new category "Not Working" is added.)
+     
+* **Marital Status**
+     + For respondents the question was not valid, are considered as not married. ( A new category "Not Married" is added.) 
+     + For respondents who answered yes or no, are considered as married. ( A new category "Married" is added.)
+
+Using the survey question "How much the spouse earn?", we can infer if the respondent is married or not. Using this information to check if the marital status affects the gender income gap can be inferred.
+     
+##### Handling Top Coded Values
+
+The top 2% earning observations are top coded to the average value of the top 2 percent of cases, it makes the data set skewed and gives a  misrespresentation of the data set. Our observations will be influenced heavily by the top coded values and reduce the accuracy of the model. For these reasons the Top Coded data observations are removed for the data set.
+
+Also, to not have a biased data set, all observations with 0 income are also changed to Not Availabes(NA). 
+Similarly for respondents Family Income, all Top coded observations are changed to Not Available(NA).
+
+```{r echo=FALSE}
+#Remove the maximum value -------------
+nyse_top2removed <- nyse[-which(nyse$income == max(nyse$income)),]
+index <- nyse_top2removed$familyIncome == max(nyse_top2removed$familyIncome, na.rm = T)
+nyse_top2removed$familyIncome[index] <- NA
+```
+     
+### DATA SUMMARY AFTER CLEANING THE DATA
+
+After Cleaning the Data Summary for all the variables considered in the model(Number and Factor variables)
+
+**FACTOR VARIABLES**
+
+```{r echo=FALSE}
+kable(summary(nyse_top2removed[,c("gender","physicalEmotionalCondition","race","collegeType","highestDegree","drugUse","industry","maritalStatus")]))
+```
+
+
+**NUMERIC VARIABLES**
+
+```{r echo=FALSE}
+kable(summary(nyse_top2removed[,c("income","totalincarceration","familyIncome")]))
+```
+
+After cleaning the data we again look at the distribution of the dataset. This time we observe that the number of outliers has reduced and the data is now more normalised as compared to the dirty data. This will help us build a better predictive model. 
+
+```{r echo = FALSE, out.extra='style="float:left"', fig.width=4.6, fig.height=6}
+with(nyse_top2removed, qqnorm(income[gender=="male"]))
+with(nyse_top2removed, qqline(income[gender=="male"], col = "blue"))
+
+with(nyse_top2removed, qqnorm(income[gender=="female"]))
+with(nyse_top2removed, qqline(income[gender=="female"], col = "blue"))
+
+```
+
+After cleaning the data and again comparing the income between men and women:
+
+```{r echo = FALSE, fig.align='center'}
+qplot(x = gender, y = income,
+      geom = "boxplot", data = nyse_top2removed,
+      xlab = "Gender", 
+      ylab = "Income Last Year",
+      fill = I("lightblue"))
+```
+
+> OBSERVATION : The above plot still suggests that men earn more than women.
+
+The data set is still slightly skewed at the edges and still has some outliers, but we cannot remove the observations as they contribute significantly to the data set. Removing the outlier will not give the correct results for the regression model. 
+
+The skewness of data set is due to income not being symmetric and data being positively skewed.
+
+Getting some general statistics for income vs gender to dig deeper into the data set.
+
+```{r echo = FALSE}
+tab_sum <- ddply(nyse_top2removed, "gender", summarise, mean = mean(income), sd = sd(income), se =sd(income) / sqrt(length(income)) )
+kable(tab_sum)
+```
+
+From the above table, we make the same inference that men (Mean = `r tab_sum$mean[2]`) earn more than women (Mean = `r tab_sum$mean[1]`) on an average. This suggest that there is an income gap between men and women. To check the signifance of the data set we run t.test and wilcoxon rank-sum test
+
+##### T Test for Income vs Gender
+
+To test the significance of our results from the above table and bar-graphs we perform a T-Test
+
+```{r echo = FALSE,comment=''}
+income.t.test <- t.test(income ~ gender, data = nyse_top2removed)
+income.t.test
+
+# Calculate difference in means between smoking and nonsmoking groups
+income_diff <- round(income.t.test$estimate[2] - income.t.test$estimate[1], 1)
+
+# Confidence level as a %
+conf.level <- attr(income.t.test$conf.int, "conf.level") * 100
+
+```
+
+> OBSERVATION : T-Test suggests that the results give above are significant. 
+
+The T-Test Results suggests, income are on average `r income_diff`g higher for men as compared to women (t-statistic `r round(income.t.test$statistic,2)`, p=`r round(income.t.test$p.value, 4)`, `r conf.level`% CI [`r round(income.t.test$conf.int,1)`]g). By observing the P-value (`r round(income.t.test$p.value, 4)`), we can confirm the impact of gender on income is significant. It supports our hypothesis, that men make more money than women. 
+
+As the data is not completely normal at the edges I also performed a wilcoxon test to check the significance of the result (wilcoxon rank-sum test does not take the assumption the data is normally distributed.)
+
+##### Wilcoxon Test for Income vs Gender
+
+```{r echo = FALSE,comment=''}
+nyse_wilcoxtest <- wilcox.test(income ~ gender, data=nyse_top2removed, conf.int=TRUE)
+nyse_wilcoxtest
+# Calculate difference in means between smoking and nonsmoking groups
+income_diff <- round(nyse_wilcoxtest$estimate[2] - nyse_wilcoxtest$estimate[1], 1)
+
+# Confidence level as a %
+conf.level <- attr(nyse_wilcoxtest$conf.int, "conf.level") * 100
+```
+
+> OBSERVATION : Wilcoxon Test also supports the results produced above.
+
+But we should also take into other factors which might have an impact on income which is not taken into consideration while discussing about gender income wage.
+
+
+Taking into consideration other variables to check their impact on income and income gap :
+
+### EXPLORING OTHER VARIABLES
+
+##### 1. Total Incarcerations
+
+Data summary for total number of incarcerations against Income Gap
+```{r}
+x <- ddply(nyse_top2removed, ~ totalincarceration, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+```{r echo = FALSE }
+incar_cor <- with(nyse_top2removed, cor(income, totalincarceration))
+```
+
+We start with the effect of total incarceration on income. We observe that the income is correlated with total number of incarcerations by a correlation factor of `r round(incar_cor,2)`. This suggests that with every 1 increase of incarcertion the income reduces by `r round(abs(incar_cor) * 100, 2)`%. 
+
+Now to check the same relation with income we use a box plot to observe income and total incarceration for men and women.
+
+```{r echo = FALSE , fig.width=10, fig.height=5}
+tot_incar.plot <- ggplot(aes(y = income, x = as.factor(totalincarceration), fill = gender), data = nyse_top2removed)
+tot_incar.plot + 
+  geom_boxplot() +
+  ylab("Income Last Year") + 
+  xlab("Total Number Of Incarcerations") + 
+  ggtitle("Income by Total Number of Incarcerations") 
+```
+
+From the above graph, we observe that the income reduces with more number of incarcerations but the income gap is not significantly different for both the genders. Also, we can see that the comparison is not available for a few data points and the data has many outliers which make the results of the variable not so significant.
+
+```{r echo = FALSE }
+cor_val <- by(data = nyse_top2removed[c("income", "totalincarceration")], 
+   INDICES = nyse_top2removed["gender"], 
+   FUN = function(x) {cor(x[,1], x[,2])})
+```
+
+
+```{r echo = FALSE, fig.width=10, fig.height=5}
+# Calculate race-specific intercepts
+income.lm <- lm(income ~ gender + totalincarceration, data = nyse_top2removed)
+
+intercepts <- c(coef(income.lm)["(Intercept)"],
+                coef(income.lm)["(Intercept)"] + coef(income.lm)["gendermale"])
+
+lines.df <- data.frame(intercepts = intercepts,
+                       slopes = rep(coef(income.lm)["totalincarceration"], 2),
+                       gender = levels(nyse_top2removed$gender))
+
+
+
+tot_barplot <- qplot(x = totalincarceration, y = income, color = gender, data = nyse_top2removed, main ="Income vs Total Incacerations") + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = gender), data = lines.df)
+
+tot_incomegap <- qplot(x = totalincarceration, y = income, color = gender, data = nyse_top2removed, main ="Income vs Total Incacerations") + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
+
+grid.arrange(tot_barplot, tot_incomegap, ncol = 2)
+```
+
+From the left graph we can observe the effect of total number of incarcerations on income for both the genders. We can see that as the number of incarcerations increase the income reduces. We consider the same effect of total incarceration on both the genders
+
+From the right graph we can observe the effect of total number of incarceration on income gap for both the genders. For both the gender the association with income is negative and almost the same. ( Slight higher for females than males.) 
+                                        
+                                            
+We can also confirm this using the correlation between income and total incarcerations from the graph above. The correlation value for men is `r round(cor_val[2],3)` and for women is `r round(cor_val[1],3)`. This tells us that the association between the number of incarceration and the income very loosely seems to depend on the gender. Both for males and females, there is a negative association between the number of incarceration and income.(Greater number of incarcerations will lead to less income).
+
+Finally to check the significance of the results performed above we use an anova test
+```{r echo = FALSE, comment = ''}
+tot_aov <- aov(income ~ gender + totalincarceration + gender:totalincarceration, data = nyse_top2removed)
+summary(tot_aov)
+```
+
+**Result** 
+The p-value (`r round(summary(tot_aov)[[1]][["Pr(>F)"]][3],3)`) which is more than 0.05 level, is not significant for gender and total incarceration. The data suggests that there is an association between income and total incarcerations but not a relation betwen income gap and total Incarcerations. Opposite to our hypothesis, total number of incarcerations does not affect the income gap between males and females. 
+
+>**Reject total incarcerations factor from income gap model** 
+
+
+##### 2. Physical and Emotional Condition at School/Work
+
+Data summary for physical and Emotional Condition against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$physicalEmotionalCondition),], ~ physicalEmotionalCondition, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if physical and emotional condition impact the income for men and women we plot bargraphs on the average incomes for both the genders: 
+
+```{r echo = FALSE, fig.width=10, fig.height=5}
+bwt.colors <- c("#009E73", "#999999")
+nyse_mean <- aggregate(income ~ physicalEmotionalCondition + gender , data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+gap.data.conf <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$physicalEmotionalCondition),], ~ physicalEmotionalCondition, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           physicalEmotionalCondition = reorder(physicalEmotionalCondition, income.gap))
+
+p.bwt <- ggplot(data = nyse_mean , aes(y = income, x = physicalEmotionalCondition, fill = gender))
+phy_barplot <- p.bwt + geom_bar(stat = "identity", position = "dodge", na.rm = TRUE) +
+  ylab("Average Total Income Last Year") + 
+  xlab("Physical and Emotional Condition") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by Physical-Emotional Condition") +
+  theme(text = element_text(size=10)) 
+
+phy_incomegap <- ggplot(data = gap.data.conf, aes(x = physicalEmotionalCondition, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("Physical Emotional Condition") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap by Physical-Emotional Condition") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=10)) 
+
+grid.arrange(phy_barplot, phy_incomegap, ncol = 2)
+
+```
+
+The first graph suggests that the physical-emotional condition at school/work which impacts your work does have an effect on the income of the respondent. But if we look at the second graph we notice that the impact is not much on income gap for men and women. 
+
+The variance for income gap with "yes" response for physical-emotional condition is very high, while the income gap between "yes" and "no" is not that much making the variable insignificant for the income gap model.
+
+We can support this analysis with an anova test on gender and physical-emotional condition factor on income.
+
+```{r echo= FALSE, comment= ''}
+phy_aov <- aov(income ~ gender * physicalEmotionalCondition, data = nyse_top2removed)
+summary(phy_aov)
+```
+
+**Result** 
+The p-value (`r round(summary(phy_aov)[[1]][["Pr(>F)"]][3],3)`) which is more than 0.05 level is not significant for gender and physical-emotional condition. The data suggests that there is an association between income and physical-emotional condition but not a relation betwen income gap and physical health. Against our hypothesis, physical and emotional condition has the same effect on both males and female incomes. 
+
+>**Reject physical-emotional condition factor from income gap model** 
+
+
+##### 3. Race
+
+Data summary for race against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$race),], ~ race, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if race impact the income for men and women we plot bargraphs on the average incomes for both the genders: 
+
+```{r echo = FALSE , fig.width=10, fig.height=5}
+nyse_mean <- aggregate(income ~ race + gender , data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+p.bwt <- ggplot(data = nyse_mean, aes(y = income, x = race, fill = gender))
+race_barplot <- p.bwt + geom_bar(stat = "identity", position = "dodge") +
+  ylab("Average Total Income Last Year") + 
+  xlab("Race") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by Race")
+
+
+gap.data.conf <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$race),], ~ race, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           race = reorder(race, income.gap))
+
+race_incomegap <- ggplot(data = gap.data.conf, aes(x = race, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("Race") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap between men and women, by race") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=12)) 
+
+grid.arrange(race_barplot, race_incomegap, ncol = 2)
+
+```
+
+From the above graphs we notice, that race has an impact on income gap between males and females. The gap is the largest for Hispanic and lowest for Blacks. Also, the income gap for mixed race can be ingored as the variance for mixed race is very high and can be ignored from our conclusion.
+To confirm our analysis, we can perform an anova test on gender and race over income.
+
+```{r echo= FALSE, comment= ''}
+race_aov <- aov(income ~ gender * race, data = nyse_top2removed)
+summary(race_aov)
+```
+
+
+**Result** 
+The p-value (`r round(summary(race_aov)[[1]][["Pr(>F)"]][3],3)`) which is less than 0.05 level and is significant for gender and race. The data suggests that there is an association between income gap and race. The results support our hypothesis that race has an effect on the income gap for men and women. 
+
+>**Accept race for income gap model** 
+
+
+
+##### 4. Number of Biological Children at Home
+
+Data summary for Number of Children at home against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$biologicalChild),], ~ biologicalChild, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+```{r echo=FALSE}
+nyse_top2removed_fullBio <- nyse_top2removed[complete.cases(nyse_top2removed$biologicalChild),]
+child_cor <- with(nyse_top2removed_fullBio, cor(income, biologicalChild))
+```
+
+We start with the effect of number of children on income. We observe that the income is correlated with number of children at home by a correlation factor of `r round(child_cor,2)`. This suggests that with every child the income reduces by `r round(abs(child_cor) * 100, 2)`%. 
+
+Now to check the same relation with income gap we use a box plot to observe income and number of children for men and women.
+
+```{r echo = FALSE,fig.width=10, fig.height=5}
+tot_incar.plot <- ggplot(aes(y = income, x = as.factor(biologicalChild), fill = gender), data = nyse_top2removed_fullBio)
+tot_incar.plot + 
+  geom_boxplot() +
+  ylab("Income Last Year") + 
+  xlab("Number of Children") + 
+  ggtitle("Income by Number of Children") 
+
+```
+
+
+From the above graph, we notice there is a big gap median income for males and females. Men earn much higher when they children at home as compared to women. Probably because the females have to take care of the children at home, so they cant take up full time jobs. The difference in income is very clearly visible between the two gender sets.
+
+```{r echo=FALSE}
+
+cor_val <- by(data = nyse_top2removed_fullBio[c("income", "biologicalChild")], 
+   INDICES = nyse_top2removed_fullBio["gender"], 
+   FUN = function(x) {cor(x[,1], x[,2])})
+```
+
+
+```{r echo = FALSE,fig.width=10, fig.height=5}
+# Calculate race-specific intercepts
+income.lm <- lm(income ~ gender + biologicalChild, data = nyse_top2removed)
+
+intercepts <- c(coef(income.lm)["(Intercept)"],
+                coef(income.lm)["(Intercept)"] + coef(income.lm)["gendermale"])
+
+lines.df <- data.frame(intercepts = intercepts,
+                       slopes = rep(coef(income.lm)["biologicalChild"], 2),
+                       gender = levels(nyse_top2removed$gender))
+
+
+
+bioChild_barplot <- qplot(x = biologicalChild, y = income, color = gender, data = nyse_top2removed, main ="Income vs Number of Children") + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = gender), data = lines.df)
+
+bioChild_incomegap <- qplot(x = biologicalChild, y = income, color = gender, data = nyse_top2removed, main ="Income vs Number of Children") + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
+
+grid.arrange(bioChild_barplot, bioChild_incomegap, ncol = 2)
+
+```
+
+From the left graph we can observe the effect of number of children on income for both the genders. We consider that number of children have the same effect for both the genders and as number of children increase the income reduces.
+
+From the right graph we can observe the effect of number of children have opposite effect on both the genders. For women the association with income is negative as women need to take care of the children at home. While for men the association of number of children with income is postive as they need to earn higher for supporting the family.
+
+**I found the opposite correlation between number of children and income for men and women interesting**
+
+The correlation value for men is `r round(cor_val[2],3)` and for women is `r round(cor_val[1],3)`. This tells us that the association between the number of incarceration and the income seems to depend on the gender. Among females, this association is negative (with more number of children in the house the females earn less), while among males, the association is positive.(Males earn more if there are more number of children at home)
+
+We can confirm our results from anova test on biological Children and gender over income
+
+```{r echo=FALSE, comment=''}
+summary(aov(income ~ gender + biologicalChild + gender:biologicalChild, data = nyse_top2removed_fullBio))
+```
+
+
+**Result** 
+The p-value (`r round(summary(race_aov)[[1]][["Pr(>F)"]][3],3)`) is significant at the 0.05 level for gender and number of children, so the data suggests that there is an association between income, gender and Number of children. 
+
+>**Accept number of children factor for income gap model**  
+
+
+
+##### 5. College Type
+
+Data summary for College Type against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$collegeType),], ~ collegeType, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if college type impact the income for men and women we plot bargraphs on the average incomes for both the genders:
+
+```{r echo = FALSE, fig.width=10, fig.height=5}
+
+nyse_mean <- aggregate(income ~ gender + collegeType, data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+p.bwt <- ggplot(data = nyse_mean, aes(y = income, x = collegeType, fill = gender))
+col_barplot <- p.bwt + geom_bar(stat = "identity", position = "dodge") +
+  ylab("Total Income Last Year") + 
+  xlab("College Type") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by College Type") +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+
+gap.data.conf <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$collegeType),], ~ collegeType, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           collegeType = reorder(collegeType, income.gap))
+
+col_incomegap <- ggplot(data = gap.data.conf, aes(x = collegeType, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("College Type") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap by College Type") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=12)) 
+
+grid.arrange(col_barplot, col_incomegap, ncol = 2)
+
+```
+
+
+From the above graphs, we observe that the income gap for all types of colleges is almost the same. The income gap is slightly more for "Private-for non profit" college type but at the same time the variance is very high for "Private- for non profit college" (By looking at the error bars in income gap graph). High variance makes the variable non-significant. Due to these reasons we can drop college type variable from our income gap model.
+
+We can support this analysis with an anova test on gender and college type factor on income.
+
+```{r echo = FALSE, comment=''}
+col_aov <- aov(income ~ gender * collegeType, data = nyse_top2removed)
+summary(col_aov)
+```
+
+**Result** 
+The p-value (`r round(summary(col_aov)[[1]][["Pr(>F)"]][3],3)`) which is more than 0.05 level is not significant for gender and college type. Against our hypothesis, college type has the same effect on both males and female incomes. 
+
+>**Reject college type from income gap model** 
+ 
+
+##### 6. Drug Use
+
+Data summary for Drug Use against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$drugUse),], ~ drugUse, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if college type impact the income for men and women we plot bargraphs on the average incomes for both the genders:
+
+```{r echo = FALSE, fig.width=10, fig.height=5}
+nyse_mean <- aggregate(income ~ drugUse + gender , data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+
+p.bwt <- ggplot(data = nyse_mean, aes(y = income, x = drugUse, fill = gender))
+drug_barplot <- p.bwt + geom_bar(stat = "identity", position = "dodge") +
+  ylab("Total Income Last Year") + 
+  xlab("Used Cocaine?") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by Hard Drugs Use")
+
+gap.data.conf <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$drugUse),], ~ drugUse, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           drugUse = reorder(drugUse, income.gap))
+
+drug_incomegap <- ggplot(data = gap.data.conf, aes(x = drugUse, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("Hard Drugs Use") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap between men and women, by Hard Drugs Use") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=12)) 
+
+grid.arrange(drug_barplot, drug_incomegap, ncol = 2)
+
+
+```
+
+From the above graph, we can observe that the variance for "yes" response is very high which makes the yes response insignificant and nullifies the effect of difference in income gap between men and women.
+
+We can support this analysis with an anova test on gender and drug use  on income.
+```{r echo=FALSE, comment=''}
+drug_aov <- aov(income ~ gender * drugUse, data = nyse_top2removed)
+summary(drug_aov)
+```
+
+**Result** 
+The p-value (`r round(summary(drug_aov)[[1]][["Pr(>F)"]][3],3)`) which is more than 0.05 level is not significant for gender and drug use. Against our hypothesis, drug use has the same effect on both males and female incomes. 
+
+>**Reject drug use from income gap model**
+
+
+
+
+##### 7. Industry
+
+Data summary for Industry against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$industry),], ~ industry, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if Industry impact the income for men and women we plot bargraphs on the average incomes for both the genders:
+
+```{r echo = FALSE, fig.width=20, fig.height=10}
+nyse_mean <- aggregate(income ~ gender + industry , data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+
+
+p.bwt <- ggplot(data = nyse_mean, aes(y = income, x = industry, fill = gender))
+p.bwt + geom_bar(stat = "identity", position = "dodge") +
+  ylab("Total Income Last Year") + 
+  xlab("Industry") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by Industry") +
+  theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1))
+
+temp_nyse <- nyse_top2removed[!(nyse_top2removed$industry=="MINING" | nyse_top2removed$industry=="ACTIVE DUTY MILITARY"),]
+gap.data.conf <- ddply(temp_nyse[complete.cases(temp_nyse$industry),], ~ industry, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           industry = reorder(industry, income.gap))
+
+ggplot(data = gap.data.conf, aes(x = industry, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("Industry Type") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap between men and women, by Type Of Industry") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=12)) +
+  theme(text = element_text(size=12), axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+
+```
+
+From the bar charts given above, we can see that industry effects both men and women. For example ACS Special Codes, females earn higher than males while in all ther other the males tend to earn a higher income. For some of the industries the variance is very high making the industry varible insignificant for our model for example Information and communcication as well as construction. 
+
+As hypothesised, industry does make a difference because some of the industries are more men dominated while some are women dominated. I also had to remove some of the industries from my analysis such as Military where the same set was unevenly distributed with 20 men and 1 woman. Such a data set does not provide us with any important information. With multiple industries behaving differently it is difficult to decide whether to keep the variable or not. To understand the correlation of industry with income gap, using anova test for income with gender and industry
+
+```{r echo=FALSE, comment=''}
+ind_aov <- aov(income ~ gender * industry, data = nyse_top2removed)
+summary(ind_aov)
+```
+
+**Result** 
+The p-value (`r round(summary(ind_aov)[[1]][["Pr(>F)"]][3],3)`) which is less than 0.05 level is significant for gender and industry. Supporting our hypothesis, industry has an impact on the income gap between men and women. 
+
+>**Accept from income gap model**
+
+
+
+##### 8. Family Income  
+
+
+```{r echo=FALSE}
+nyse_top2removed_fulfam <- nyse_top2removed[complete.cases(nyse_top2removed$familyIncome),]
+fam_cor <- with(nyse_top2removed_fulfam, cor(income, familyIncome))
+```
+
+We start by checking the relation between family income and income using scatter plots
+
+```{r echo = FALSE, fig.align="center"}
+
+tot_incar.plot <- ggplot(data=nyse_top2removed_fulfam, aes(x=familyIncome, y=income, colour = gender, shape = gender ))
+tot_incar.plot + 
+  geom_point() + 
+  stat_smooth() +
+  ylab("Total Income Last Year") + 
+  xlab("Last Year Family Income") + 
+  ggtitle("Income by Family Income") 
+```
+
+
+The graph is densely populated and there is postive association between income and family income. Since respondent's income is part of the total final income, we need to check the correlation between income and family income. If they are highly correlated, we need to remove variable from our model as it give us the wrong results for its impact on income.
+
+
+```{r echo = FALSE, fig.align="center"}
+#TO CHECK THE CORRELATION OF 
+
+var.names <- c("income", "familyIncome")
+#pairs(nyse_top2removed[,var.names])
+
+
+# Function taken from ?pairs Example section.  
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
+}
+
+# Use panel.cor to display correlations in lower panel.
+pairs(nyse_top2removed_fulfam[,var.names], lower.panel = panel.cor)
+```
+
+The above matrix suggest that income is slightly correlated to family income with a correlation factor of `r round(fam_cor,2)`
+We can infer from this that family income even though might be significant, its results might be exaggerated due its correlation value.
+
+
+```{r echo=FALSE}
+cor_val <- by(data = nyse_top2removed_fulfam[c("income", "familyIncome")], 
+   INDICES = nyse_top2removed_fulfam["gender"], 
+   FUN = function(x) {cor(x[,1], x[,2])})
+```
+
+
+```{r echo =FALSE, fig.width=10, fig.height=5}
+income.lm <- lm(income ~ gender + familyIncome, data = nyse_top2removed)
+
+# Calculate race-specific intercepts
+intercepts <- c(coef(income.lm)["(Intercept)"],
+                coef(income.lm)["(Intercept)"] + coef(income.lm)["gendermale"])
+
+lines.df <- data.frame(intercepts = intercepts,
+                       slopes = rep(coef(income.lm)["familyIncome"], 2),
+                       gender = levels(nyse_top2removed$gender))
+
+
+
+fam_barplot <- qplot(x = familyIncome, y = income, color = gender, data = nyse_top2removed) + 
+  geom_abline(aes(intercept = intercepts, 
+                  slope = slopes, 
+                  color = gender), data = lines.df)
+
+fam_incomegap <- qplot(x = familyIncome, y = income, color = gender, data = nyse_top2removed) + stat_smooth(method = "lm", se = FALSE, fullrange = TRUE)
+
+grid.arrange(fam_barplot, fam_incomegap, ncol = 2)
+
+```
+
+From the left graph we can observe the effect of family income on income for both the genders. We consider that family income has the same effect for both the genders (increase in family income leads to an increase in income)
+
+For the right graph we consider a different effect on males and females. Though from the graph we can observe almost the same effect of family income on both men and women.
+
+
+By looking at the graphs above we observe that family income doees have an impact on income and income gap. The correlation value for men is `r round(cor_val[2],3)` and for women is `r round(cor_val[1],3)`. For both the genders, there is a positive association between income and family income (More family income lead to more income). But we must also observe the correlation between income and family income from the above matrix.
+
+This suggests that even though family income is signifcant for our model, though due to correlation it does not contribute to our model as much as it is depicted by the results.
+
+We can support this analysis with an anova test on gender and drug use  on income.
+```{r echo=FALSE, comment=''}
+fam_aov <- aov(income ~ gender * familyIncome, data = nyse_top2removed_fulfam)
+summary(fam_aov)
+```
+
+
+**Family Income is not causal**
+This is the old adage that correlation does not imply causation. In this example, we have strong evidence that higher family income is positively associated with respondents income. This doesn’t mean that decreasing family income will lower the income. The relationship is not causal – at least not in that direction. A more reasonable explanation is that higher income will lead to higher family income.
+
+
+**Result** 
+The p-value (`r round(summary(fam_aov)[[1]][["Pr(>F)"]][3],3)`) which is less than 0.05 level is significant for gender and family income. We can observe there is some correlation between income and family income Supporting which supports our our hypothesis, family Income has an impact on the income gap between men and women. 
+
+>**Accept family income for  income gap model**
+
+
+##### 9. Marital Status
+
+Data summary for Marital Status against Income Gap
+```{r}
+x <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$maritalStatus),], ~ maritalStatus, summarize, 
+      income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE))
+kable(x)
+```
+
+To check if marital status impact the income for men and women we plot bargraphs on the average incomes for both the genders:
+
+```{r echo = FALSE, fig.width=10, fig.height=5}
+nyse_top2removed_fullmar <- nyse_top2removed[complete.cases(nyse_top2removed$maritalStatus),]
+nyse_mean <- aggregate(income ~ maritalStatus + gender , data = nyse_top2removed, 
+          FUN = function(x) {mean = mean(x)})
+
+
+
+p.bwt <- ggplot(data = nyse_mean, aes(y = income, x = maritalStatus, fill = gender))
+marital_barplot <- p.bwt + geom_bar(stat = "identity", position = "dodge") +
+  ylab("Total Income Last Year") + 
+  xlab("Married?") +
+  guides(fill = guide_legend(title = "Gender")) + 
+  scale_fill_manual(values=bwt.colors) + 
+  ggtitle("Income by Marital Status")
+
+
+gap.data.conf <- ddply(nyse_top2removed[complete.cases(nyse_top2removed$maritalStatus),], ~ maritalStatus, summarize, 
+                       income.gap = mean(income[gender == "male"], na.rm = TRUE) - mean(income[gender == "female"], na.rm = TRUE),
+                       upper = -t.test(income ~ gender)$conf.int[1],
+                       lower = -t.test(income ~ gender)$conf.int[2],
+                       is.significant = as.numeric(t.test(income ~ gender)$p.value < 0.05))
+
+gap.data.conf <- transform(gap.data.conf,
+                           maritalStatus = reorder(maritalStatus, income.gap))
+
+marital_incomegap <- ggplot(data = gap.data.conf, aes(x = maritalStatus, y = income.gap)) +
+  geom_bar(stat = "identity", fill = I('#548696')) +
+  xlab("Marital Status") + 
+  ylab("Income gap($)") +
+  ggtitle("Income gap by Marital Status") + 
+  guides(fill = FALSE) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), width = 0.1, size = 1) +
+  theme(text = element_text(size=12)) 
+
+
+grid.arrange(marital_barplot, marital_incomegap, ncol = 2)
+
+```
+
+By looking at the graphs above we observe that the marital status has a very different impact on men and women. The correlation value for men is 0.231 and for women is -0.189. This tells us that the association between marital status and income seems to depend on the gender. Among females, this association is negative (married women earn less compared to unmarried), while among males, the association is positive.(married men earn more than unmarried men)
+
+To check the significance of the results performed above we use an anove test
+
+```{r}
+mar_aov <- aov(income ~ gender * maritalStatus, data = nyse_top2removed)
+summary(mar_aov)
+```
+
+
+**Result** 
+The p-value (`r round(summary(mar_aov)[[1]][["Pr(>F)"]][3],3)`) which is less than 0.05 level is significant for gender and marital status. Supporting our hypothesis, marital status has an impact on the income gap between men and women.
+
+>**Accept marital status for income gap model**
+
+
+### LINEAR REGRESSION MODEL
+
+After checking the all the variables individually with the income gap we have come down to 5 variables using the anova test
+
+  * Race
+  * Number of Children in the house
+  * Family Income
+  * Industry
+  * Marital Status
+  
+All these variables had a significant effect on the income gap between males and females as we observed the results to be when we considered each variable seperately.
+
+Now building a regression model on these variables along with gender to understand the income gap between and men and women:
+
+> **lm(income ~ gender  + race + biologicalChild + familyIncome + industry + maritalStatus, data = nyse_top2removed)**
+  
+
+```{r echo=FALSE}
+income.lm <- lm(income ~ gender  + race + biologicalChild + familyIncome + industry + maritalStatus, data = nyse_top2removed)
+options(scipen=4)
+kable(summary(income.lm)$coef, digits = c(3, 3, 3, 4))
+```
+
+
+
+Some of the inferences based on this model
+
+
+  1. Looking at the p-values, it looks like gendermale is statistically significant predictor of income with a p-value 
+  ` r round(summary(income.lm)[[4]][27*3 - 2],3)`. 
+  
+  2. Males earn `r income.lm$coefficients["gendermale"]` more than females on an average.
+  
+  3. Family Income also seems to be an statistically significant predictor of income, but we know that income and Family income have a correlation of `r round(fam_cor,2)`. This reduces the significance of family income on income as this might not depict a causal effect. 
+  
+  4. Marital Status as predicted in the hypothesis also has an impact on income gap and is significant with P-Value of 
+  `r round(summary(income.lm)[[4]][4* 26],10)`
+  
+
+
+##### Check for interaction terms for the regression model with gender
+
+Now that we have considered the effect of each variable seperated, we can take into account the impact of the interaction between the final variables and gender. To Understand the significance of joint effect of gender and other variables on Income we look at the interaction terms and compare the linear regression models with and without the interaction term. The P- value from the Anova test will tell us if the interaction term is significant and if we should include the term in our final regression model.
+
+
+###### 1. Race
+
+```{r echo=FALSE, comment=''}
+income.lm <- lm(income ~ gender  + race + biologicalChild + familyIncome + industry + maritalStatus, data = nyse_top2removed)
+incomerac.lm.interact <- update(income.lm, . ~ . + gender*race)
+race_int <- anova(income.lm, incomerac.lm.interact)
+race_int
+race_p <- round(race_int$`Pr(>F)`[2],3)
+```
+
+Looking at the P value, we are able to conclude that race has an impact on the income gap as the P value we get from comparing the linear regression model with and without interaction term is significant.
+
+>Inference : Race and Gender interaction term is significant with P-Value approx `r race_p`.
+
+
+###### 2. Number of Children
+
+```{r echo=FALSE, comment=''}
+incomebio.lm.interact <- update(income.lm, . ~ . + gender*biologicalChild)
+bio_int <- anova(income.lm, incomebio.lm.interact)
+bio_int
+bio_p <- round(bio_int$`Pr(>F)`[2],3)
+```
+
+Looking at the P value, we are able to conclude that number of children at home has an impact on the income gap as the P value we get from comparing the linear regression model with and without interaction term is significant.
+
+>Inference : Number of Children and Gender interaction term is significant with P-Value approx `r bio_p`.
+
+###### 3. Family Income
+
+```{r echo=FALSE, comment=''}
+incomefam.lm.interact <- update(income.lm, . ~ . + gender*familyIncome)
+fam_int <- anova(income.lm, incomefam.lm.interact)
+fam_int
+fam_p <- round(fam_int$`Pr(>F)`[2],3)
+```
+
+Looking at the P value, we are able to conclude that family income has an impact on the income gap as the P value we get from comparing the linear regression model with and without interaction term is significant.
+
+>Inference : Family Income and Gender interaction term is significant with P-Value approx `r fam_p`.
+
+###### 4. Industry
+
+```{r echo=FALSE, comment=''}
+incomeind.lm.interact <- update(income.lm, . ~ . + gender*industry)
+ind_int <- anova(income.lm, incomeind.lm.interact)
+ind_int
+ind_p <- round(ind_int$`Pr(>F)`[2],3)
+```
+
+Looking at the P value, we are able to conclude that industry does not have an impact on the income gap as the P value we get from comparing the linear regression model with and without interaction term is not significant.
+
+>Inference : Industry and Gender interaction term is not significant with P-Value approx `r ind_p`.
+
+###### 5. Marital Status
+
+```{r echo=FALSE, comment=''}
+incomemar.lm.interact <- update(income.lm, . ~ . + gender*maritalStatus)
+mar_int <- anova(income.lm, incomemar.lm.interact)
+mar_int
+mar_p <- round(mar_int$`Pr(>F)`[2],3)
+```
+
+Looking at the P value, we are able to conclude that marital status has an impact on the income gap as the P value we get from comparing the linear regression model with and without interaction term is significant.
+
+>Inference : Marital and Gender interaction term is significant with P-Value approx `r mar_p`.
+
+
+
+
+From the five interaction models we tested, only Industry-Gender interaction term was not significant, which we can also observe from the graphs above because many industries were not significantly related to income gap in the given data set. So we will include the interaction terms for 4 variables (Race, Marital Status, Number of children and Family Income) but not for Industry.
+
+From all the given observarions I would like to concentrate on the affect of Marital Status of the respondent on Income gap. As per the studies done, married men earn more than unmarried men while it is the opposite for women, unmarried women earn more than married women.
+
+##### Final Regression Model
+
+> **lm(income ~ race + industry + familyIncome + biologicalChild + gender * maritalStatus, data = nyse_top2removed)**
+
+```{r}
+final.income.lm <- lm(income ~ gender * maritalStatus + race + industry + familyIncome + biologicalChild , data = nyse_top2removed)
+options(scipen=4)
+kable(summary(final.income.lm)$coef, digits = c(3, 3, 3, 4))
+
+```
+
+
+Looking at the p-values, it looks like gendermale is statistically significant predictor of income with a p-value 
+` r round(summary(final.income.lm)[[4]][27*3 - 2],3)`. 
+
+**SOME OF THE INTERESTING OBSERVATIONS IN THE FINAL REGRESSION MODEL**
+
+  1. Looking at the analysis, we can confirm with some confidence that Males do earn more than Women. 
+  Males earn `r round(final.income.lm$coefficients["gendermale"],3)` more than females on an average.
+  
+  2. The income difference among married men and married women is $ `r round(abs(coef(final.income.lm)["gendermale:maritalStatusNot Married"]), 2)`  less than the difference between unmarried men and unmarried women. Marital Status is a factor that is highly associated with the income gap between men and women.
+  
+  3. The income gap is not significantly dependent on number of children at home as assumed in the hypothesis as the P-value for the given variable is less than 0.05.
+  
+  4. The Estimated income gap between unmarried men and unmarried is equal to the sum of "co-efficients of gendermale" + "co-efficients of gendermale:maritalStatusNot Married" 
+  
+     = `r round(coef(final.income.lm)["gendermale"], 0) + round(coef(final.income.lm)["gendermale:maritalStatusNot Married"], 0)`
+  
+  5. Since married is the baseline for the regression model, the estimated income between men and women for married respondents = "Gendermale" + 0
+ 
+     = `r round(coef(final.income.lm)["gendermale"], 0) + 0`
+
+```{r echo=FALSE, fig.align="center", fig.width=10, fig.height=10}
+par(mfrow = c(2,2))
+plot(final.income.lm)
+```
+
+These four plots are important diagnostic tools in assessing whether the linear model is appropriate. The first two plots are the most important.
+
+**Residuals vs. Fitted**  
+We see that there’s a clear “funneling” phenomenon. The distribution of the residuals is quite well concentrated around 0 for small fitted values, but they get more and more spread out as the fitted values increase. This is an instance of “increasing variance”. The standard linear regression assumption is that the variance is constant across the entire range. As this assumption isn’t valid, these are clear indicators that the given linear model is inappropriate.
+
+**Normal QQ plot** 
+Residuals deviate from the diagonal line in both the upper and lower tail. The tails are observed to be ‘heavier’ (have larger values) than what we would expect under the standard modeling assumptions. This is indicated by the points forming a “steeper” line than the diagonal. The p-values to be believable, the residuals from the regression must look approximately normally distributed. So we can consider the P- Values with confidence.
+
+**Scale-location plot** 
+This is another version of the residuals vs fitted plot. As the first plot has funneling phenomenon, similarly the Red line should be horizontal but it is tilted suggesting the model is not completely accurate.
+
+**Residuals vs Leverage** 
+The data is positively skewed from the begining. Even after removing the top coded values from the data set, income is still postively skewed. For this reason, we have outliers. Points with high residual (poorly described by the model) and high leverage (high influence on model fit) are outliers. They’re skewing the model fit away from the rest of the data.
+
+### CONCLUSION
+
+Of the so many variables hypothesised only **Race, Marital Status and Industry have a major impact** on the income gap. Family income, even though considered as signifcant cannot be taken as significant as there is a correlation between income and family income. The relation between income and family income is more of a consequence than a causal effect.
+
+From the given study, we can say with some confidence that there is a significant difference in income between men and women. But this variation is also dependent on variables such as Race, Marital Status and Industry. Marital Status specially interest me as the effect on men and women was large.
+
+I believe this gender pay gap is also prevelant due to various factors such as culture, society structure and historical factors which cannot be quantified. Some of these reasons are reflected by the factors such as race and marital Status which were studied in this analysis.
+
+
+
+The data given by NLSY was dirty and incomplete. The data had many top coded values which if not accounted would have reduced our data set considerably. To use the given data set for making inferences, we made many assumptions and imputed multiple values. The changes made in the data set and the assumptions taken before the analysis will influence our final results.
+
+The assumptions made during our analysis:
+
+1. *Independence* - We have collected this data over a long duration of time. To perform linear regression, we have to assume that the data is independent. For this reason our analysis might be inaccurate.
+
+2. *Normality* - The data is not completely normalized especially at the edge. The data set is skewed as we can see from Q-Q Plot generated. This linear model expression may not be good reflector for very low and high income respondents.
+
+3. *Imputations* - Due to so many incomplete values and coded values from -1 to -5, many assumptions are made to make imputations. These imputations will have an impact on the results produced in the end.
+
+4. *Top Coded Values* - The top coded values are removed from the data set as we observed from the Q-Q Plot, the top coded income values were making the data set skewed which will influence our results.
+
+These assumptions have influenced the data, leading to a biased linear regression model. Some of the potential limitations of my analysis are 
+
+* This regression model cannot be applied to high income earners and low income earners as they were removed from the data set.
+* We dont have very high confidence level on our model as R squared value which is `r round(summary(final.income.lm)[[8]] *100,2)` is not very high to be a good predictor model.
+* Not all variables given in the data set are taken into consideration, so this model cannot predict the effect of new variables on income gap.
+* The imputations make very strong assumptions, which might not be very reflective of the real world situations.
+
+
+In this section you should summarize your main conclusions. You should also discuss potential limitations of your analysis and findings. Are there potential confounders that you didn’t control for? Are the models you fit believable?
+
+As the data was not clean and not all variables were taken into consideration while building the regression model, I do not have high condifence level on my model. The training set used for building the linaer regression model was not completely normally distributed which is an assumption taken by linear regression, making this model not that reliable. The conclusions made by my analysis can be considered as possible reflection of the real world scenario but cannot be generalised to a very large scale. Policy makers can use the study to understand the possible trends but not use to make important decisions just on the basis of this study.
+
